@@ -243,7 +243,7 @@ export default function SeoOptimizer() {
             <div className="flex w-full h-full pt-16 pb-20">
                 
                 {/* Left Sidebar - Input */}
-                <div className="w-[420px] bg-[#0c0c0e] border-r border-white/5 flex flex-col shrink-0">
+                <div className="w-[420px] bg-[#09090b] border-r border-white/5 flex flex-col shrink-0">
                     <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-800">
                         
                         <div className="space-y-8">
@@ -341,7 +341,7 @@ export default function SeoOptimizer() {
                 {/* Right Content - Results */}
                 <div className="flex-1 bg-[#09090b] relative overflow-hidden flex flex-col">
                     {/* Background Gradient */}
-                    <div className="absolute inset-0 bg-linear-to-br from-emerald-900/10 via-zinc-950 to-zinc-950 pointer-events-none" />
+                    <div className="absolute inset-0 bg-linear-to-br from-zinc-900/50 via-zinc-950/50 to-zinc-950 pointer-events-none" />
 
                     {loading ? null : (!optimizedTitle && optimizedDescriptions.length === 0) ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-zinc-600 animate-in fade-in zoom-in-95 duration-500">
