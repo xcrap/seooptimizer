@@ -12,7 +12,6 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 - **Real-time Character Counting**: Visual feedback for character limits (Green for optimal length, Red for invalid).
 - **Duplicate Presets**: Easily clone existing presets to create variations.
 - **Model Transparency**: Shows which AI model is currently generating your content.
-- **Premium UI**: Sleek dark mode design with glassmorphism effects and smooth animations.
 
 ## Tech Stack
 
@@ -25,7 +24,7 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 ### Prerequisites
 
-- Node.js installed
+- **Runtime**: Bun (required)
 - An API Key from [OpenRouter](https://openrouter.ai/)
 
 ### Installation
@@ -38,7 +37,7 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 2. Install dependencies:
    ```bash
-   npm install
+   bun install
    ```
 
 3. Configure Environment Variables:
@@ -50,7 +49,7 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 4. Run the development server:
    ```bash
-   npm run dev
+   bun run dev
    ```
 
 ## Usage
