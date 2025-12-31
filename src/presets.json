@@ -1,0 +1,20 @@
+[
+  {
+    "id": "std-seo",
+    "name": "Standard SEO",
+    "systemPrompt": "You are an SEO expert. Optimize the title and description for search engines. Use relevant keywords, maintain a persuasive tone, and strictly adhere to length constraints.",
+    "titleMin": 50,
+    "titleMax": 60,
+    "descMin": 140,
+    "descMax": 160
+  },
+  {
+    "id": "click-bait",
+    "name": "High CTR / Viral",
+    "systemPrompt": "You are a marketing expert. Create a catchy, click-worthy title and curiosity-inducing description. Focus on emotional triggers.",
+    "titleMin": 40,
+    "titleMax": 65,
+    "descMin": 120,
+    "descMax": 160
+  }
+]
