@@ -1,16 +1,65 @@
-# React + Vite
+# SEO Optimizer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern, AI-powered tool to optimize your page titles and meta descriptions for search engines. Built with React and designed for speed and aesthetics.
 
-Currently, two official plugins are available:
+![SEO Optimizer Screenshot](./public/screenshot.png) 
+*(Note: You might want to add a screenshot here)*
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- **AI-Powered Generation**: Uses advanced LLMs (via OpenRouter) to generate SEO-optimized title tags and meta descriptions.
+- **Smart Presets**: Save and manage different prompting strategies (e.g., "Standard SEO", "Click-bait", "E-commerce").
+- **Real-time Character Counting**: Visual feedback for character limits (Green for optimal length, Red for invalid).
+- **Duplicate Presets**: Easily clone existing presets to create variations.
+- **Model Transparency**: Shows which AI model is currently generating your content.
+- **Premium UI**: Sleek dark mode design with glassmorphism effects and smooth animations.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+- **Frontend**: React, Vite
+- **Styling**: Tailwind CSS v4, Lucide React (Icons)
+- **AI Integration**: OpenAI SDK (connected to OpenRouter)
+- **State Management**: React `useState` / `useEffect` + LocalStorage for persistence
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Getting Started
+
+### Prerequisites
+
+- Node.js installed
+- An API Key from [OpenRouter](https://openrouter.ai/)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/xcrap/seooptimizer.git
+   cd seooptimizer
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure Environment Variables:
+   Create a `.env.local` file in the root directory:
+   ```env
+   VITE_OPENROUTER_API_KEY=your_openrouter_api_key_here
+   VITE_OPENROUTER_MODEL=google/gemini-2.0-flash-lite-preview-02-05:free
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+## Usage
+
+1. **Enter Content**: Paste your current page title and description (or leave blank).
+2. **Select Preset**: Choose a preset strategy from the top bar (or create your own in "Manage Presets").
+3. **Generate**: Click "Generate Optimization" to receive AI-suggested variations.
+4. **Copy**: Click the copy icon to grab the suggestions.
+
+## License
+
+MIT

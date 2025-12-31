@@ -474,6 +474,65 @@ export default function SeoOptimizer() {
                                 </CardTitle>
                                 {!editingPreset && (
                                     <div className="flex gap-2">
+                                        <div className="flex bg-zinc-900 rounded-md border border-zinc-800 mr-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 text-xs text-zinc-400 hover:text-white px-3 border-r border-zinc-800 rounded-r-none"
+                                                title="Import Presets"
+                                                onClick={() => document.getElementById('preset-import').click()}
+                                            >
+                                                <FileJson className="h-3.5 w-3.5 mr-2" />
+                                                Import
+                                            </Button>
+                                            <input 
+                                                id="preset-import" 
+                                                type="file" 
+                                                className="hidden" 
+                                                accept="application/json"
+                                                onChange={(e) => {
+                                                    const file = e.target.files[0];
+                                                    if (!file) return;
+                                                    
+                                                    const reader = new FileReader();
+                                                    reader.onload = (event) => {
+                                                        try {
+                                                            const imported = JSON.parse(event.target.result);
+                                                            if (Array.isArray(imported)) {
+                                                                if (confirm(`Import ${imported.length} presets? This will replace your current list.`)) {
+                                                                    setPresets(imported);
+                                                                }
+                                                            } else {
+                                                                alert('Invalid preset file format');
+                                                            }
+                                                        } catch (err) {
+                                                            alert('Failed to parse JSON file');
+                                                        }
+                                                    };
+                                                    reader.readAsText(file);
+                                                    e.target.value = null;
+                                                }}
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 text-xs text-zinc-400 hover:text-white px-3 rounded-l-none"
+                                                title="Export to JSON"
+                                                onClick={() => {
+                                                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(presets, null, 2));
+                                                    const downloadAnchorNode = document.createElement('a');
+                                                    downloadAnchorNode.setAttribute("href", dataStr);
+                                                    downloadAnchorNode.setAttribute("download", "seo-presets.json");
+                                                    document.body.appendChild(downloadAnchorNode);
+                                                    downloadAnchorNode.click();
+                                                    downloadAnchorNode.remove();
+                                                }}
+                                            >
+                                                <Save className="h-3.5 w-3.5 mr-2" />
+                                                Export
+                                            </Button>
+                                        </div>
+
                                         <Button 
                                             size="sm" 
                                             variant="outline" 
