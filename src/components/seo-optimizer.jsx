@@ -281,6 +281,12 @@ export default function SeoOptimizer() {
                                     placeholder="Enter your current meta description..."
                                     className="min-h-[180px] bg-zinc-900/50 border-zinc-800/80 text-sm resize-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 focus-visible:border-emerald-500/50 transition-all placeholder:text-zinc-700"
                                 />
+                                <div className="flex justify-end pt-2 px-1">
+                                    <span className="text-[10px] text-zinc-600 font-mono flex items-center gap-1.5 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800/50">
+                                        <Sparkles className="h-3 w-3 opacity-50" />
+                                        {import.meta.env.VITE_OPENROUTER_MODEL || "google/gemini-2.0-flash-lite-preview-02-05:free"}
+                                    </span>
+                                </div>
                             </div>
 
                             {/* Advanced Config Toggle */}
@@ -568,6 +574,22 @@ export default function SeoOptimizer() {
                                                     onClick={() => setEditingPreset({...preset})}
                                                 >
                                                     <Edit2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-8 w-8 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-950/20"
+                                                    title="Duplicate Preset"
+                                                    onClick={() => {
+                                                        const newPreset = { 
+                                                            ...preset, 
+                                                            id: crypto.randomUUID(),
+                                                            name: `Copy of ${preset.name}`
+                                                        };
+                                                        setPresets([...presets, newPreset]);
+                                                    }}
+                                                >
+                                                    <Copy className="h-3.5 w-3.5" />
                                                 </Button>
                                                 <Button 
                                                     variant="ghost" 
