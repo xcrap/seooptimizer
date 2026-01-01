@@ -107,6 +107,17 @@ localStorage.setItem("seo_presets", JSON.stringify(presets));
 }
 }, [presets]);
 
+// Handle ESC key to close manager
+useEffect(() => {
+    const handleKeyDown = (e) => {
+        if (e.key === "Escape" && showPresetManager) {
+            setShowPresetManager(false);
+        }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+}, [showPresetManager]);
+
 // Apply Preset
 const applyPreset = (id) => {
 const preset = presets.find(p => p.id === id);
@@ -229,7 +240,7 @@ if (current < min || current> max) return "text-destructive";
                 <div className="h-6 w-px bg-zinc-800 mx-2" />
 
                 <Button variant="ghost" size="sm"
-                    className="h-9 text-xs text-zinc-400 hover:text-white hover:bg-zinc-900 gap-2" onClick={()=>
+                    className="h-9 text-xs text-zinc-400 hover:text-white hover:bg-zinc-900 gap-2 focus-visible:ring-0" onClick={()=>
                     setShowPresetManager(true)}
                     >
                     <Settings className="h-4 w-4" />
@@ -616,7 +627,11 @@ if (current < min || current> max) return "text-destructive";
                             ) : (
                                 <div className="divide-y divide-zinc-900">
                                     {presets.map((preset) => (
-                                        <div key={preset.id} className="p-4 flex items-center justify-between hover:bg-zinc-900/30 transition-colors group">
+                                        <div 
+                                            key={preset.id} 
+                                            className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors group cursor-pointer"
+                                            onClick={() => applyPreset(preset.id)}
+                                        >
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
                                                     <h4 className="text-sm font-medium text-zinc-200">{preset.name}</h4>
@@ -631,7 +646,10 @@ if (current < min || current> max) return "text-destructive";
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-zinc-500 hover:text-white hover:bg-zinc-800"
-                                                    onClick={() => setEditingPreset({...preset})}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingPreset({...preset});
+                                                    }}
                                                 >
                                                     <Edit2 className="h-3.5 w-3.5" />
                                                 </Button>
@@ -640,7 +658,8 @@ if (current < min || current> max) return "text-destructive";
                                                     size="icon"
                                                     className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/20"
                                                     title="Duplicate Preset"
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         const newPreset = {
                                                             ...preset,
                                                             id: crypto.randomUUID(),
@@ -655,7 +674,8 @@ if (current < min || current> max) return "text-destructive";
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-zinc-500 hover:text-red-400 hover:bg-red-950/30"
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         if (confirm('Are you sure you want to delete this preset?')) {
                                                             const newPresets = presets.filter(p => p.id !== preset.id);
                                                             setPresets(newPresets);
