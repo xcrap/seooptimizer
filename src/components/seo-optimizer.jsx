@@ -37,7 +37,12 @@ if (!apiKey) return null;
 return new OpenAI({
 apiKey,
 baseURL,
-dangerouslyAllowBrowser: true
+dangerouslyAllowBrowser: true,
+timeout: 30000,
+defaultHeaders: {
+  "HTTP-Referer": window.location.origin,
+  "X-Title": "SEO Optimizer"
+}
 });
 };
 
@@ -173,13 +178,30 @@ if (current < min || current> max) return "text-destructive";
     const completion = await client.chat.completions.create({
     model: import.meta.env.VITE_OPENROUTER_MODEL || "google/gemini-2.0-flash-lite-preview-02-05:free",
     messages: [
-    { role: "system", content: "You are a helpful SEO assistant that outputs JSON." },
+    { role: "system", content: "You are a helpful SEO assistant. Return ONLY a valid JSON object with keys \"title\" (string) and \"description_variants\" (array of 3 strings). No other text." },
     { role: "user", content: prompt }
-    ],
-    response_format: { type: "json_object" }
+    ]
     });
 
-    const content = completion.choices[0].message.content;
+    let content = completion.choices[0].message.content;
+
+    if (!content) {
+        throw new Error("Empty response from model");
+    }
+
+    // Strip <think>...</think> tags from reasoning models like DeepSeek R1
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+    // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
+    content = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+
+    // Try to extract JSON if there's extra text around it
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+        throw new Error("Invalid response format");
+    }
+    content = jsonMatch[0];
+
     const parsed = JSON.parse(content);
     setOptimizedTitle(parsed.title || "");
 
@@ -193,7 +215,7 @@ if (current < min || current> max) return "text-destructive";
 
     } catch (error) {
     console.error("Optimization failed", error);
-    setError("Optimization failed. Please try again.");
+    setError(error.message || "Optimization failed. Please try again.");
     } finally {
     setLoading(false);
     }
