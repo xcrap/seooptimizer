@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { OpenAI } from "openai";
 import {
 Copy,
 Settings,
@@ -27,25 +26,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { cn } from "@/lib/utils";
 import defaultPresets from "@/presets.json";
 
-// Initialize OpenAI client (same as before)
-const getClient = () => {
-const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-const baseURL = "https://openrouter.ai/api/v1";
-
-if (!apiKey) return null;
-
-return new OpenAI({
-apiKey,
-baseURL,
-dangerouslyAllowBrowser: true,
-timeout: 30000,
-defaultHeaders: {
-  "HTTP-Referer": window.location.origin,
-  "X-Title": "SEO Optimizer"
-}
-});
-};
-
 export default function SeoOptimizer() {
 // State
 const [title, setTitle] = useState("");
@@ -57,6 +37,12 @@ const [optimizedDescriptions, setOptimizedDescriptions] = useState([]);
 
 const [loading, setLoading] = useState(false);
 const [error, setError] = useState(null);
+const [serviceStatus, setServiceStatus] = useState({
+    providerLabel: "Local Codex",
+    model: "gpt-5.4-mini",
+    reasoningEffort: "medium",
+    ready: null
+});
 
 // Settings State
 const [systemPrompt, setSystemPrompt] = useState(defaultPresets[0].systemPrompt);
@@ -80,12 +66,29 @@ const stored = localStorage.getItem("seo_presets");
 if (stored) {
 try {
 setPresets(JSON.parse(stored));
-} catch (e) {
+} catch {
 setPresets(defaultPresets);
 }
 } else {
 setPresets(defaultPresets);
 }
+}, []);
+
+// Load local AI service status
+useEffect(() => {
+fetch("/api/status")
+    .then(response => response.ok ? response.json() : null)
+    .then(status => {
+        if (status) setServiceStatus(status);
+    })
+    .catch(() => {
+        setServiceStatus({
+            providerLabel: "Local AI",
+            model: "offline",
+            reasoningEffort: "unknown",
+            ready: false
+        });
+    });
 }, []);
 
 // Load Drafts
@@ -146,63 +149,38 @@ if (current < min || current> max) return "text-destructive";
     if (!title && !description) return;
 
     setError(null);
-    const client = getClient();
-    if (!client) {
-    setError("Missing API Key. Please check .env.local");
-    return;
-    }
-
     setLoading(true);
     setOptimizedTitle("");
     setOptimizedDescriptions([]);
     try {
-    const prompt = `
-    Task: Optimize the following content for SEO.
-
-    Inputs:
-    ${title ? `Title: "${title}"` : "Title: (Not provided)"}
-    ${description ? `Description: "${description}"` : "Description: (Not provided)"}
-
-    Constraints:
-    - Title Length: Ideally between ${titleMin} and ${titleMax} characters.
-    - Description Length: Ideally between ${descMin} and ${descMax} characters.
-    - Output Format: JSON with key "title" (string) and "description_variants" (array of exactly 3 strings).
-
-    Instructions:
-    - ${systemPrompt}
-    - Provide 3 distinct variations for the description to account for different angles (e.g., one benefit-focused, one
-    curiosity-focused, one keyword-focused).
-    - Return ONLY valid JSON.
-    `;
-
-    const completion = await client.chat.completions.create({
-    model: import.meta.env.VITE_OPENROUTER_MODEL || "google/gemini-2.0-flash-lite-preview-02-05:free",
-    messages: [
-    { role: "system", content: "You are a helpful SEO assistant. Return ONLY a valid JSON object with keys \"title\" (string) and \"description_variants\" (array of 3 strings). No other text." },
-    { role: "user", content: prompt }
-    ]
+    const response = await fetch("/api/optimize", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            title,
+            description,
+            systemPrompt,
+            titleMin,
+            titleMax,
+            descMin,
+            descMax
+        })
     });
 
-    let content = completion.choices[0].message.content;
+    const parsed = await response.json().catch(() => ({}));
 
-    if (!content) {
-        throw new Error("Empty response from model");
+    if (!response.ok) {
+        throw new Error(parsed.error || "Optimization failed. Please try again.");
     }
 
-    // Strip <think>...</think> tags from reasoning models like DeepSeek R1
-    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-
-    // Strip markdown code blocks if present (```json ... ``` or ``` ... ```)
-    content = content.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
-
-    // Try to extract JSON if there's extra text around it
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-        throw new Error("Invalid response format");
-    }
-    content = jsonMatch[0];
-
-    const parsed = JSON.parse(content);
+    setServiceStatus({
+        providerLabel: parsed.providerLabel || serviceStatus.providerLabel,
+        model: parsed.model || serviceStatus.model,
+        reasoningEffort: parsed.reasoningEffort || serviceStatus.reasoningEffort,
+        ready: true
+    });
     setOptimizedTitle(parsed.title || "");
 
     if (Array.isArray(parsed.description_variants)) {
@@ -317,7 +295,7 @@ if (current < min || current> max) return "text-destructive";
                                 <div className="flex justify-end pt-2 px-1">
                                     <span className="text-[10px] text-zinc-600 font-mono flex items-center gap-1.5 bg-zinc-900/50 px-2 py-1 rounded border border-zinc-800/50">
                                         <Sparkles className="h-3 w-3 opacity-50" />
-                                        {import.meta.env.VITE_OPENROUTER_MODEL || "google/gemini-2.0-flash-lite-preview-02-05:free"}
+                                        {serviceStatus.providerLabel}: {serviceStatus.model} / {serviceStatus.reasoningEffort}
                                     </span>
                                 </div>
                             </div>
@@ -539,7 +517,7 @@ if (current < min || current> max) return "text-destructive";
                                                             } else {
                                                                 alert('Invalid preset file format');
                                                             }
-                                                        } catch (err) {
+                                                        } catch {
                                                             alert('Failed to parse JSON file');
                                                         }
                                                     };

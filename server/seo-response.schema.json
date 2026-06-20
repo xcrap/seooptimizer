@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "description_variants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["title", "description_variants"],
+  "additionalProperties": false
+}

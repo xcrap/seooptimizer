@@ -7,9 +7,9 @@ SEO Optimizer is a React-based single-page application built with Vite. It uses 
 - **Framework**: React 18+ (Vite)
 - **Runtime/Package Manager**: Bun
 - **Styling**: Tailwind CSS v4, Lucide React (Icons), Glassmorphism design system
-- **AI/LLM**: internal integration via OpenAI SDK pointing to OpenRouter API
+- **AI/LLM**: local Vite/Bun API backed by Codex CLI by default, or OpenAI SDK with the official OpenAI API
 - **State**: React Hooks (`useState`, `useEffect`), LocalStorage
-- **Deployment**: Static build (`bun run build`) -> `dist/`
+- **Deployment**: Frontend static build (`bun run build`) -> `dist/`; AI generation requires the local Vite API in dev/preview or an equivalent hosted API endpoint.
 
 ## Core Features
 1.  **Input/Output**: Users input a current Title/Description. The app outputs optimized alternatives.
@@ -32,5 +32,7 @@ SEO Optimizer is a React-based single-page application built with Vite. It uses 
 - `src/index.css`: Tailwind configuration and global styles.
 
 ## Key Environment Variables
-- `VITE_OPENROUTER_API_KEY`: Required for generations.
-- `VITE_OPENROUTER_MODEL`: Specifies the model (e.g., `google/gemini-2.0-flash-lite-preview-02-05:free`).
+- `SEO_OPTIMIZER_PROVIDER`: `codex` by default, or `openai` for direct OpenAI API usage.
+- `SEO_OPTIMIZER_MODEL`: Model used by either provider, currently `gpt-5.4-mini`.
+- `SEO_OPTIMIZER_REASONING_EFFORT`: Reasoning effort passed to Codex/OpenAI reasoning models, currently `medium`.
+- `OPENAI_API_KEY`: Required only when `SEO_OPTIMIZER_PROVIDER=openai`.

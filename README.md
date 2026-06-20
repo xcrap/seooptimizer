@@ -7,7 +7,7 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 ## Features
 
-- **AI-Powered Generation**: Uses advanced LLMs (via OpenRouter) to generate SEO-optimized title tags and meta descriptions.
+- **AI-Powered Generation**: Uses local Codex by default, or the official OpenAI API when configured.
 - **Smart Presets**: Save and manage different prompting strategies (e.g., "Standard SEO", "Click-bait", "E-commerce").
 - **Real-time Character Counting**: Visual feedback for character limits (Green for optimal length, Red for invalid).
 - **Duplicate Presets**: Easily clone existing presets to create variations.
@@ -17,7 +17,7 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 - **Frontend**: React, Vite
 - **Styling**: Tailwind CSS v4, Lucide React (Icons)
-- **AI Integration**: OpenAI SDK (connected to OpenRouter)
+- **AI Integration**: Local Vite/Bun API backed by Codex CLI or the OpenAI SDK
 - **State Management**: React `useState` / `useEffect` + LocalStorage for persistence
 
 ## Getting Started
@@ -25,7 +25,9 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 ### Prerequisites
 
 - **Runtime**: Bun (required)
-- An API Key from [OpenRouter](https://openrouter.ai/)
+- Bun
+- Codex CLI signed in with ChatGPT (`codex login`) for the default local mode
+- Optional: an OpenAI Platform API key if you prefer API usage
 
 ### Installation
 
@@ -43,14 +45,27 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 3. Configure Environment Variables:
    Create a `.env.local` file in the root directory:
    ```env
-   VITE_OPENROUTER_API_KEY=your_openrouter_api_key_here
-   VITE_OPENROUTER_MODEL=google/gemini-2.0-flash-lite-preview-02-05:free
+   SEO_OPTIMIZER_PROVIDER=codex
+   SEO_OPTIMIZER_MODEL=gpt-5.4-mini
+   SEO_OPTIMIZER_REASONING_EFFORT=medium
+   ```
+
+   For the official OpenAI API instead of local Codex:
+   ```env
+   SEO_OPTIMIZER_PROVIDER=openai
+   SEO_OPTIMIZER_MODEL=gpt-5.4-mini
+   SEO_OPTIMIZER_REASONING_EFFORT=medium
+   OPENAI_API_KEY=your_openai_api_key_here
    ```
 
 4. Run the development server:
    ```bash
    bun run dev
    ```
+
+The app calls `/api/optimize` on the local Vite server. No provider key is exposed to the browser.
+
+`bun run build` still creates a static frontend in `dist/`, but AI generation needs a server-side `/api/optimize` endpoint. For local use, run Vite dev or preview so the bundled local API middleware is available.
 
 ## Usage
 
