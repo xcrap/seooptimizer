@@ -27,3 +27,8 @@ dist-ssr
 
 # User Presets Export
 seo-presets.json
+
+# Local SQLite database
+database/*.sqlite
+database/*.sqlite-shm
+database/*.sqlite-wal

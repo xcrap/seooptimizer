@@ -1,4 +1,11 @@
 import { ApiError, getServiceStatus, optimizeSeo } from "./seo-ai.js";
+import {
+  getDraft,
+  listPresets,
+  migrateBrowserStorage,
+  replacePresets,
+  saveDraft,
+} from "./preset-store.js";
 
 export function seoOptimizerApiMiddleware() {
   return async (req, res, next) => {
@@ -12,6 +19,34 @@ export function seoOptimizerApiMiddleware() {
     try {
       if (url.pathname === "/api/status" && req.method === "GET") {
         sendJson(res, 200, await getServiceStatus());
+        return;
+      }
+
+      if (url.pathname === "/api/presets" && req.method === "GET") {
+        sendJson(res, 200, { presets: await listPresets() });
+        return;
+      }
+
+      if (url.pathname === "/api/presets" && req.method === "PUT") {
+        const body = await readJsonBody(req);
+        sendJson(res, 200, { presets: await replacePresets(body.presets) });
+        return;
+      }
+
+      if (url.pathname === "/api/presets/migrate-browser-storage" && req.method === "POST") {
+        const body = await readJsonBody(req);
+        sendJson(res, 200, await migrateBrowserStorage(body));
+        return;
+      }
+
+      if (url.pathname === "/api/draft" && req.method === "GET") {
+        sendJson(res, 200, await getDraft());
+        return;
+      }
+
+      if (url.pathname === "/api/draft" && req.method === "PUT") {
+        const body = await readJsonBody(req);
+        sendJson(res, 200, await saveDraft(body));
         return;
       }
 
@@ -47,7 +82,7 @@ function readJsonBody(req) {
     req.on("data", (chunk) => {
       raw += chunk.toString();
 
-      if (raw.length > 64 * 1024) {
+      if (raw.length > 256 * 1024) {
         reject(new ApiError("Request body is too large.", 413));
         req.destroy();
       }

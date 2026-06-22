@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
 Copy,
 Settings,
@@ -59,19 +59,85 @@ const [showAdvanced, setShowAdvanced] = useState(false);
 // Preset Manager State
 const [showPresetManager, setShowPresetManager] = useState(false);
 const [editingPreset, setEditingPreset] = useState(null);
+const [draftLoaded, setDraftLoaded] = useState(false);
+const draftTouchedRef = useRef(false);
 
-// Load presets
+// Load saved data from SQLite, migrating old browser storage when present.
 useEffect(() => {
-const stored = localStorage.getItem("seo_presets");
-if (stored) {
-try {
-setPresets(JSON.parse(stored));
-} catch {
-setPresets(defaultPresets);
-}
-} else {
-setPresets(defaultPresets);
-}
+    let cancelled = false;
+
+    const applyPresetFromList = (nextPresets) => {
+        const selectedPreset = nextPresets.find(p => p.id === defaultPresets[0].id) || nextPresets[0];
+
+        if (selectedPreset) {
+            setCurrentPresetId(selectedPreset.id);
+            setSystemPrompt(selectedPreset.systemPrompt);
+            setTitleMin(selectedPreset.titleMin);
+            setTitleMax(selectedPreset.titleMax);
+            setDescMin(selectedPreset.descMin);
+            setDescMax(selectedPreset.descMax);
+        }
+    };
+
+    const loadStoredData = async () => {
+        const browserStorage = readBrowserStorageSnapshot();
+
+        try {
+            let nextPresets = [];
+            let nextDraft = null;
+
+            if (browserStorage.hasData) {
+                const response = await fetch("/api/presets/migrate-browser-storage", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        presets: browserStorage.presets,
+                        draft: browserStorage.draft
+                    })
+                });
+                const parsed = await parseApiResponse(response);
+                nextPresets = parsed.presets;
+                nextDraft = parsed.draft;
+                clearBrowserStorageSnapshot();
+            } else {
+                const [presetsResponse, draftResponse] = await Promise.all([
+                    fetch("/api/presets"),
+                    fetch("/api/draft")
+                ]);
+                const presetsPayload = await parseApiResponse(presetsResponse);
+                nextDraft = await parseApiResponse(draftResponse);
+                nextPresets = presetsPayload.presets;
+            }
+
+            if (cancelled) return;
+
+            const storedPresets = Array.isArray(nextPresets) ? nextPresets : defaultPresets;
+            setPresets(storedPresets);
+            applyPresetFromList(storedPresets);
+
+            if (nextDraft && !draftTouchedRef.current) {
+                setTitle(nextDraft.title || "");
+                setDescription(nextDraft.description || "");
+            }
+        } catch (error) {
+            console.error("Failed to load saved presets", error);
+            if (!cancelled) {
+                setPresets(defaultPresets);
+                applyPresetFromList(defaultPresets);
+                setError(error.message || "Failed to load saved presets.");
+            }
+        } finally {
+            if (!cancelled) setDraftLoaded(true);
+        }
+    };
+
+    loadStoredData();
+
+    return () => {
+        cancelled = true;
+    };
 }, []);
 
 // Load local AI service status
@@ -91,29 +157,24 @@ fetch("/api/status")
     });
 }, []);
 
-// Load Drafts
+// Save drafts to SQLite after the initial database load.
 useEffect(() => {
-const draftTitle = localStorage.getItem("draft_title");
-const draftDesc = localStorage.getItem("draft_description");
-if (draftTitle) setTitle(draftTitle);
-if (draftDesc) setDescription(draftDesc);
-}, []);
+    if (!draftLoaded) return;
 
-// Save Drafts
-useEffect(() => {
-localStorage.setItem("draft_title", title);
-}, [title]);
+    const timeout = window.setTimeout(() => {
+        fetch("/api/draft", {
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ title, description })
+        }).catch(error => {
+            console.error("Failed to save draft", error);
+        });
+    }, 400);
 
-useEffect(() => {
-localStorage.setItem("draft_description", description);
-}, [description]);
-
-// Save Presets to LocalStorage
-useEffect(() => {
-if (presets.length > 0) {
-localStorage.setItem("seo_presets", JSON.stringify(presets));
-}
-}, [presets]);
+    return () => window.clearTimeout(timeout);
+}, [title, description, draftLoaded]);
 
 // Handle ESC key to close manager
 useEffect(() => {
@@ -126,16 +187,61 @@ useEffect(() => {
     return () => window.removeEventListener("keydown", handleKeyDown);
 }, [showPresetManager]);
 
-// Apply Preset
-const applyPreset = (id) => {
-const preset = presets.find(p => p.id === id);
-if (preset) {
-setCurrentPresetId(id);
+const updateTitle = (value) => {
+draftTouchedRef.current = true;
+setTitle(value);
+};
+
+const updateDescription = (value) => {
+draftTouchedRef.current = true;
+setDescription(value);
+};
+
+const applyPresetValues = (preset) => {
 setSystemPrompt(preset.systemPrompt);
 setTitleMin(preset.titleMin);
 setTitleMax(preset.titleMax);
 setDescMin(preset.descMin);
 setDescMax(preset.descMax);
+};
+
+const savePresetList = async (nextPresets, preferredPresetId = currentPresetId) => {
+try {
+setError(null);
+const response = await fetch("/api/presets", {
+    method: "PUT",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ presets: nextPresets })
+});
+const parsed = await parseApiResponse(response);
+const savedPresets = Array.isArray(parsed.presets) ? parsed.presets : nextPresets;
+const selectedPreset = savedPresets.find(p => p.id === preferredPresetId) || savedPresets[0];
+
+setPresets(savedPresets);
+
+if (selectedPreset) {
+    setCurrentPresetId(selectedPreset.id);
+    applyPresetValues(selectedPreset);
+} else {
+    setCurrentPresetId("");
+}
+
+return savedPresets;
+} catch (error) {
+console.error("Failed to save presets", error);
+setError(error.message || "Failed to save presets.");
+return null;
+}
+};
+
+// Apply Preset
+const applyPreset = (id) => {
+const preset = presets.find(p => p.id === id);
+if (preset) {
+setCurrentPresetId(id);
+applyPresetValues(preset);
 }
 };
 
@@ -269,7 +375,7 @@ if (current < min || current> max) return "text-destructive";
                                     {title.length}
                                 </span>
                             </div>
-                            <Textarea id="input-title" value={title} onChange={e=> setTitle(e.target.value)}
+                            <Textarea id="input-title" value={title} onChange={e=> updateTitle(e.target.value)}
                                     placeholder="Enter your current page title..."
                                     className="min-h-[100px] bg-muted/50 border-input/80 text-sm resize-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground"
                                 />
@@ -288,7 +394,7 @@ if (current < min || current> max) return "text-destructive";
                                 <Textarea
                                     id="input-description"
                                     value={description}
-                                    onChange={e => setDescription(e.target.value)}
+                                    onChange={e => updateDescription(e.target.value)}
                                     placeholder="Enter your current meta description..."
                                     className="min-h-[180px] bg-muted/50 border-input/80 text-sm resize-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/50 transition-all placeholder:text-muted-foreground"
                                 />
@@ -507,12 +613,12 @@ if (current < min || current> max) return "text-destructive";
                                                     if (!file) return;
                                                     
                                                     const reader = new FileReader();
-                                                    reader.onload = (event) => {
+                                                    reader.onload = async (event) => {
                                                         try {
                                                             const imported = JSON.parse(event.target.result);
                                                             if (Array.isArray(imported)) {
                                                                 if (confirm(`Import ${imported.length} presets? This will replace your current list.`)) {
-                                                                    setPresets(imported);
+                                                                    await savePresetList(imported, imported[0]?.id || currentPresetId);
                                                                 }
                                                             } else {
                                                                 alert('Invalid preset file format');
@@ -665,7 +771,7 @@ if (current < min || current> max) return "text-destructive";
                                                             id: crypto.randomUUID(),
                                                             name: `Copy of ${preset.name}`
                                                         };
-                                                        setPresets([...presets, newPreset]);
+                                                        savePresetList([...presets, newPreset], currentPresetId);
                                                     }}
                                                 >
                                                     <Copy className="h-3.5 w-3.5" />
@@ -678,10 +784,10 @@ if (current < min || current> max) return "text-destructive";
                                                         e.stopPropagation();
                                                         if (confirm('Are you sure you want to delete this preset?')) {
                                                             const newPresets = presets.filter(p => p.id !== preset.id);
-                                                            setPresets(newPresets);
-                                                            if (currentPresetId === preset.id && newPresets.length > 0) {
-                                                                setCurrentPresetId(newPresets[0].id);
-                                                            }
+                                                            savePresetList(
+                                                                newPresets,
+                                                                currentPresetId === preset.id ? newPresets[0]?.id : currentPresetId
+                                                            );
                                                         }
                                                     }}
                                                 >
@@ -712,19 +818,24 @@ if (current < min || current> max) return "text-destructive";
                                 <Button
                                     size="sm"
                                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                                    onClick={() => {
+                                    onClick={async () => {
                                         if (!editingPreset.name) return alert("Content name required");
                                         
                                         let newPresets = [...presets];
+                                        let nextActivePresetId = currentPresetId;
                                         if (editingPreset.id === 'new') {
                                             const newPreset = { ...editingPreset, id: crypto.randomUUID() };
                                             newPresets.push(newPreset);
+                                            if (!currentPresetId) {
+                                                nextActivePresetId = newPreset.id;
+                                            }
                                         } else {
                                             newPresets = newPresets.map(p => p.id === editingPreset.id ? editingPreset : p);
+                                            nextActivePresetId = editingPreset.id === currentPresetId ? editingPreset.id : currentPresetId;
                                         }
                                         
-                                        setPresets(newPresets);
-                                        setEditingPreset(null);
+                                        const savedPresets = await savePresetList(newPresets, nextActivePresetId);
+                                        if (savedPresets) setEditingPreset(null);
                                     }}
                                 >
                                     <Save className="h-3.5 w-3.5 mr-2" />
@@ -737,4 +848,57 @@ if (current < min || current> max) return "text-destructive";
             )}
         </div>
     );
+}
+
+async function parseApiResponse(response) {
+const parsed = await response.json().catch(() => ({}));
+
+if (!response.ok) {
+throw new Error(parsed.error || `Request failed with status ${response.status}`);
+}
+
+return parsed;
+}
+
+function readBrowserStorageSnapshot() {
+const snapshot = {
+presets: undefined,
+draft: undefined,
+hasData: false
+};
+
+try {
+const rawPresets = window.localStorage.getItem("seo_presets");
+if (rawPresets) {
+    const parsedPresets = JSON.parse(rawPresets);
+    if (Array.isArray(parsedPresets)) {
+        snapshot.presets = parsedPresets;
+        snapshot.hasData = true;
+    }
+}
+
+const storedTitle = window.localStorage.getItem("draft_title");
+const storedDescription = window.localStorage.getItem("draft_description");
+if (storedTitle !== null || storedDescription !== null) {
+    snapshot.draft = {
+        title: storedTitle || "",
+        description: storedDescription || ""
+    };
+    snapshot.hasData = true;
+}
+} catch (error) {
+console.error("Failed to read browser storage for migration", error);
+}
+
+return snapshot;
+}
+
+function clearBrowserStorageSnapshot() {
+try {
+window.localStorage.removeItem("seo_presets");
+window.localStorage.removeItem("draft_title");
+window.localStorage.removeItem("draft_description");
+} catch (error) {
+console.error("Failed to clear migrated browser storage", error);
+}
 }

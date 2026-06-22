@@ -18,7 +18,8 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 - **Frontend**: React, Vite
 - **Styling**: Tailwind CSS v4, Lucide React (Icons)
 - **AI Integration**: Local Vite/Bun API backed by Codex CLI or the OpenAI SDK
-- **State Management**: React `useState` / `useEffect` + LocalStorage for persistence
+- **State Management**: React `useState` / `useEffect` with local SQLite persistence through the Vite/Bun API
+- **Local Data**: Presets and drafts are stored in `database/seo-optimizer.sqlite`
 
 ## Getting Started
 
@@ -65,7 +66,9 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 
 The app calls `/api/optimize` on the local Vite server. No provider key is exposed to the browser.
 
-`bun run build` still creates a static frontend in `dist/`, but AI generation needs a server-side `/api/optimize` endpoint. For local use, run Vite dev or preview so the bundled local API middleware is available.
+Preset prompts and title/description drafts are saved to `database/seo-optimizer.sqlite`. The database file and its SQLite sidecar files are git-ignored. On first launch after upgrading from browser storage, the app migrates existing `localStorage` presets/drafts into SQLite and clears the old browser keys after the migration succeeds.
+
+`bun run build` still creates a static frontend in `dist/`, but AI generation and local persistence need the server-side `/api/*` endpoints. For local use, run Vite dev or preview so the bundled local API middleware is available.
 
 ## Usage
 
