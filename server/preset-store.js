@@ -1,15 +1,16 @@
 import Database from "better-sqlite3";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ApiError } from "./seo-ai.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = resolve(__dirname, "..");
-const databaseDir = resolve(appRoot, "database");
-const databasePath = resolve(databaseDir, "seo-optimizer.sqlite");
 const defaultPresetsPath = resolve(appRoot, "src", "presets.json");
+const currentPresetStateKey = "current_preset_id";
+const draftTitleStateKey = "draft_title";
+const draftDescriptionStateKey = "draft_description";
 
 let db;
 
@@ -71,27 +72,31 @@ export async function replacePresets(inputPresets) {
 
 export async function getDraft() {
   return {
-    title: await getStateValue("draft_title"),
-    description: await getStateValue("draft_description"),
+    title: await getStateValue(draftTitleStateKey),
+    description: await getStateValue(draftDescriptionStateKey),
+    currentPresetId: await getStateValue(currentPresetStateKey),
   };
 }
 
 export async function saveDraft(input) {
   const draft = normalizeDraft(input);
-  const now = new Date().toISOString();
-  const database = await getDatabase();
-  const statement = database.prepare(`
-    INSERT INTO app_state (key, value, updated_at)
-    VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET
-      value = excluded.value,
-      updated_at = excluded.updated_at
-  `);
-
-  statement.run("draft_title", draft.title, now);
-  statement.run("draft_description", draft.description, now);
+  await setStateValue(draftTitleStateKey, draft.title);
+  await setStateValue(draftDescriptionStateKey, draft.description);
 
   return getDraft();
+}
+
+export async function getCurrentPreset() {
+  return {
+    currentPresetId: await getStateValue(currentPresetStateKey),
+  };
+}
+
+export async function saveCurrentPreset(input) {
+  const currentPresetId = normalizeCurrentPresetId(input);
+  await setStateValue(currentPresetStateKey, currentPresetId);
+
+  return getCurrentPreset();
 }
 
 export async function migrateBrowserStorage(input) {
@@ -119,6 +124,10 @@ export async function migrateBrowserStorage(input) {
     await saveDraft(input.draft);
   }
 
+  if (typeof input?.currentPresetId === "string") {
+    await saveCurrentPreset(input);
+  }
+
   return {
     presets: await listPresets(),
     draft: await getDraft(),
@@ -130,19 +139,25 @@ export async function migrateBrowserStorage(input) {
 }
 
 export function getPresetDatabasePath() {
-  return databasePath;
+  return getDatabasePath();
 }
 
 async function getDatabase() {
   if (db) return db;
 
-  mkdirSync(databaseDir, { recursive: true });
+  const databasePath = getDatabasePath();
+  mkdirSync(dirname(databasePath), { recursive: true });
   db = new Database(databasePath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   initializeDatabase(db);
 
   return db;
+}
+
+function getDatabasePath() {
+  const configuredPath = resolve(appRoot, process.env.DB_PATH || "database");
+  return extname(configuredPath) ? configuredPath : resolve(configuredPath, "seo-optimizer.sqlite");
 }
 
 function initializeDatabase(database) {
@@ -224,6 +239,18 @@ async function getStateValue(key) {
   return typeof row?.value === "string" ? row.value : "";
 }
 
+async function setStateValue(key, value) {
+  const now = new Date().toISOString();
+  const database = await getDatabase();
+  database.prepare(`
+    INSERT INTO app_state (key, value, updated_at)
+    VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET
+      value = excluded.value,
+      updated_at = excluded.updated_at
+  `).run(key, value, now);
+}
+
 function normalizePresets(inputPresets) {
   if (!Array.isArray(inputPresets)) {
     throw new ApiError("Presets must be an array.", 400);
@@ -256,6 +283,10 @@ function normalizeDraft(input) {
     title: typeof input?.title === "string" ? input.title : "",
     description: typeof input?.description === "string" ? input.description : "",
   };
+}
+
+function normalizeCurrentPresetId(input) {
+  return typeof input?.currentPresetId === "string" ? input.currentPresetId.trim() : "";
 }
 
 function asNonEmptyString(value, fallback) {

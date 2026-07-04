@@ -46,6 +46,9 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
 3. Configure Environment Variables:
    Create a `.env.local` file in the root directory:
    ```env
+   APP_URL=http://localhost:5174
+   DB_PATH=./database
+
    SEO_OPTIMIZER_PROVIDER=codex
    SEO_OPTIMIZER_MODEL=gpt-5.4-mini
    SEO_OPTIMIZER_REASONING_EFFORT=medium
@@ -64,9 +67,11 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
    bun run dev
    ```
 
-The app calls `/api/optimize` on the local Vite server. No provider key is exposed to the browser.
+The app calls `/api/optimize` on the same app server. No provider key is exposed to the browser.
 
-Preset prompts and title/description drafts are saved to `database/seo-optimizer.sqlite`. The database file and its SQLite sidecar files are git-ignored. On first launch after upgrading from browser storage, the app migrates existing `localStorage` presets/drafts into SQLite and clears the old browser keys after the migration succeeds.
+This app uses one server: Vite serves the React app and mounts `/api/*` in the same process. Set `APP_URL` to the URL where the app runs. Locally, include the port in `APP_URL`, for example `http://localhost:5174`; online, use your domain, for example `https://seo.example.com`. `API_PORT` and `API_URL` are not needed for the current single-server setup.
+
+Preset prompts, the selected preset, and title/description drafts are saved under `DB_PATH`, which defaults to `database/` and uses `seo-optimizer.sqlite` inside that directory. The database file and its SQLite sidecar files are git-ignored. On first launch after upgrading from browser storage, the app migrates existing `localStorage` presets/drafts into SQLite and clears the old browser keys after the migration succeeds.
 
 `bun run build` still creates a static frontend in `dist/`, but AI generation and local persistence need the server-side `/api/*` endpoints. For local use, run Vite dev or preview so the bundled local API middleware is available.
 

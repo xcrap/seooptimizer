@@ -60,14 +60,18 @@ const [showAdvanced, setShowAdvanced] = useState(false);
 const [showPresetManager, setShowPresetManager] = useState(false);
 const [editingPreset, setEditingPreset] = useState(null);
 const [draftLoaded, setDraftLoaded] = useState(false);
+const [presetSaveStatus, setPresetSaveStatus] = useState("");
 const draftTouchedRef = useRef(false);
 
 // Load saved data from SQLite, migrating old browser storage when present.
 useEffect(() => {
     let cancelled = false;
 
-    const applyPresetFromList = (nextPresets) => {
-        const selectedPreset = nextPresets.find(p => p.id === defaultPresets[0].id) || nextPresets[0];
+    const applyPresetFromList = (nextPresets, preferredPresetId = "") => {
+        const selectedPreset =
+            nextPresets.find(p => p.id === preferredPresetId) ||
+            nextPresets.find(p => p.id === defaultPresets[0].id) ||
+            nextPresets[0];
 
         if (selectedPreset) {
             setCurrentPresetId(selectedPreset.id);
@@ -115,7 +119,7 @@ useEffect(() => {
 
             const storedPresets = Array.isArray(nextPresets) ? nextPresets : defaultPresets;
             setPresets(storedPresets);
-            applyPresetFromList(storedPresets);
+            applyPresetFromList(storedPresets, nextDraft?.currentPresetId);
 
             if (nextDraft && !draftTouchedRef.current) {
                 setTitle(nextDraft.title || "");
@@ -187,6 +191,10 @@ useEffect(() => {
     return () => window.removeEventListener("keydown", handleKeyDown);
 }, [showPresetManager]);
 
+useEffect(() => {
+    setPresetSaveStatus("");
+}, [currentPresetId, systemPrompt, titleMin, titleMax, descMin, descMax]);
+
 const updateTitle = (value) => {
 draftTouchedRef.current = true;
 setTitle(value);
@@ -203,6 +211,24 @@ setTitleMin(preset.titleMin);
 setTitleMax(preset.titleMax);
 setDescMin(preset.descMin);
 setDescMax(preset.descMax);
+};
+
+const persistCurrentPresetId = async (currentPresetId) => {
+try {
+const response = await fetch("/api/current-preset", {
+    method: "PUT",
+    headers: {
+        "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ currentPresetId })
+});
+await parseApiResponse(response);
+return true;
+} catch (error) {
+console.error("Failed to save current preset", error);
+setError(error.message || "Failed to save current preset.");
+return false;
+}
 };
 
 const savePresetList = async (nextPresets, preferredPresetId = currentPresetId) => {
@@ -224,8 +250,10 @@ setPresets(savedPresets);
 if (selectedPreset) {
     setCurrentPresetId(selectedPreset.id);
     applyPresetValues(selectedPreset);
+    await persistCurrentPresetId(selectedPreset.id);
 } else {
     setCurrentPresetId("");
+    await persistCurrentPresetId("");
 }
 
 return savedPresets;
@@ -242,8 +270,40 @@ const preset = presets.find(p => p.id === id);
 if (preset) {
 setCurrentPresetId(id);
 applyPresetValues(preset);
+void persistCurrentPresetId(id);
 }
 };
+
+const saveCurrentPreset = async () => {
+const preset = presets.find(p => p.id === currentPresetId);
+if (!preset) return;
+
+const nextPreset = {
+    ...preset,
+    systemPrompt,
+    titleMin,
+    titleMax,
+    descMin,
+    descMax
+};
+const savedPresets = await savePresetList(
+    presets.map(p => p.id === currentPresetId ? nextPreset : p),
+    currentPresetId
+);
+
+if (savedPresets) {
+    setPresetSaveStatus("Saved");
+}
+};
+
+const currentPreset = presets.find(p => p.id === currentPresetId);
+const currentPresetHasChanges = Boolean(currentPreset && (
+    currentPreset.systemPrompt !== systemPrompt ||
+    currentPreset.titleMin !== titleMin ||
+    currentPreset.titleMax !== titleMax ||
+    currentPreset.descMin !== descMin ||
+    currentPreset.descMax !== descMax
+));
 
 const getLengthColor = (current, min, max) => {
 if (current === 0) return "text-muted-foreground";
@@ -431,11 +491,11 @@ if (current < min || current> max) return "text-destructive";
                                                 className="min-h-[80px] bg-zinc-900/50 border-zinc-800 text-[11px] font-mono text-zinc-400 focus-visible:ring-zinc-700"
                                             />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label className="text-[10px] text-zinc-500 uppercase font-bold">Title Range</Label>
-                                                <div className="flex gap-2">
-                                                    <Input type="number" value={titleMin} onChange={e => setTitleMin(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+	                                        <div className="grid grid-cols-2 gap-4">
+	                                            <div className="space-y-2">
+	                                                <Label className="text-[10px] text-zinc-500 uppercase font-bold">Title Range</Label>
+	                                                <div className="flex gap-2">
+	                                                    <Input type="number" value={titleMin} onChange={e => setTitleMin(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
                                                     <Input type="number" value={titleMax} onChange={e => setTitleMax(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
                                                 </div>
                                             </div>
@@ -443,13 +503,32 @@ if (current < min || current> max) return "text-destructive";
                                                 <Label className="text-[10px] text-zinc-500 uppercase font-bold">Desc Range</Label>
                                                 <div className="flex gap-2">
                                                     <Input type="number" value={descMin} onChange={e => setDescMin(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
-                                                    <Input type="number" value={descMax} onChange={e => setDescMax(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+	                                                    <Input type="number" value={descMax} onChange={e => setDescMax(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+	                                                </div>
+	                                            </div>
+	                                        </div>
+	                                        <div className="flex items-center justify-between gap-3 pt-1">
+	                                            <span className={cn(
+	                                                "text-[10px] font-mono truncate",
+	                                                presetSaveStatus ? "text-primary" : currentPresetHasChanges ? "text-yellow-400" : "text-zinc-600"
+	                                            )}>
+	                                                {presetSaveStatus || (currentPresetHasChanges ? "Unsaved preset changes" : "Preset saved")}
+	                                            </span>
+	                                            <Button
+	                                                type="button"
+	                                                size="sm"
+	                                                variant="outline"
+	                                                disabled={!currentPreset || !currentPresetHasChanges}
+	                                                onClick={saveCurrentPreset}
+	                                                className="h-8 shrink-0 text-xs border-zinc-800 bg-zinc-900/50 hover:bg-zinc-800 hover:text-white disabled:opacity-40"
+	                                            >
+	                                                <Save className="h-3.5 w-3.5 mr-2" />
+	                                                Save Preset
+	                                            </Button>
+	                                        </div>
+	                                    </div>
+	                                )}
+	                            </div>
                         </div>
                     </div>
 

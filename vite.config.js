@@ -5,7 +5,9 @@ import { seoOptimizerApiMiddleware } from './server/api-middleware.js'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  Object.assign(process.env, loadEnv(mode, process.cwd(), ''))
+  const env = loadEnv(mode, process.cwd(), '')
+  Object.assign(process.env, env)
+  const appPort = getAppPort(env.APP_URL, 5173)
 
   return {
     plugins: [
@@ -26,5 +28,28 @@ export default defineConfig(({ mode }) => {
         "@": "/src",
       },
     },
+    server: {
+      port: appPort,
+      strictPort: true,
+    },
+    preview: {
+      port: appPort,
+      strictPort: true,
+    },
   }
 })
+
+function parsePort(value, fallback) {
+  const port = Number(value)
+  return Number.isInteger(port) && port > 0 && port <= 65535 ? port : fallback
+}
+
+function getAppPort(appUrl, fallback) {
+  if (!appUrl) return fallback
+
+  try {
+    return parsePort(new URL(appUrl).port, fallback)
+  } catch {
+    return fallback
+  }
+}

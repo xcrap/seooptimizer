@@ -1,9 +1,11 @@
 import { ApiError, getServiceStatus, optimizeSeo } from "./seo-ai.js";
 import {
+  getCurrentPreset,
   getDraft,
   listPresets,
   migrateBrowserStorage,
   replacePresets,
+  saveCurrentPreset,
   saveDraft,
 } from "./preset-store.js";
 
@@ -47,6 +49,17 @@ export function seoOptimizerApiMiddleware() {
       if (url.pathname === "/api/draft" && req.method === "PUT") {
         const body = await readJsonBody(req);
         sendJson(res, 200, await saveDraft(body));
+        return;
+      }
+
+      if (url.pathname === "/api/current-preset" && req.method === "GET") {
+        sendJson(res, 200, await getCurrentPreset());
+        return;
+      }
+
+      if (url.pathname === "/api/current-preset" && req.method === "PUT") {
+        const body = await readJsonBody(req);
+        sendJson(res, 200, await saveCurrentPreset(body));
         return;
       }
 
