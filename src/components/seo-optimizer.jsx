@@ -60,7 +60,7 @@ const [showAdvanced, setShowAdvanced] = useState(false);
 const [showPresetManager, setShowPresetManager] = useState(false);
 const [editingPreset, setEditingPreset] = useState(null);
 const [draftLoaded, setDraftLoaded] = useState(false);
-const [presetSaveStatus, setPresetSaveStatus] = useState("");
+const [savedPresetSignature, setSavedPresetSignature] = useState("");
 const draftTouchedRef = useRef(false);
 
 // Load saved data from SQLite, migrating old browser storage when present.
@@ -191,10 +191,6 @@ useEffect(() => {
     return () => window.removeEventListener("keydown", handleKeyDown);
 }, [showPresetManager]);
 
-useEffect(() => {
-    setPresetSaveStatus("");
-}, [currentPresetId, systemPrompt, titleMin, titleMax, descMin, descMax]);
-
 const updateTitle = (value) => {
 draftTouchedRef.current = true;
 setTitle(value);
@@ -292,7 +288,7 @@ const savedPresets = await savePresetList(
 );
 
 if (savedPresets) {
-    setPresetSaveStatus("Saved");
+    setSavedPresetSignature(getPresetSignature(currentPresetId, nextPreset));
 }
 };
 
@@ -304,6 +300,15 @@ const currentPresetHasChanges = Boolean(currentPreset && (
     currentPreset.descMin !== descMin ||
     currentPreset.descMax !== descMax
 ));
+const currentPresetSignature = currentPreset ? getPresetSignature(currentPresetId, {
+    ...currentPreset,
+    systemPrompt,
+    titleMin,
+    titleMax,
+    descMin,
+    descMax
+}) : "";
+const presetSaveStatus = savedPresetSignature && savedPresetSignature === currentPresetSignature ? "Saved" : "";
 
 const getLengthColor = (current, min, max) => {
 if (current === 0) return "text-muted-foreground";
@@ -927,6 +932,17 @@ if (current < min || current> max) return "text-destructive";
             )}
         </div>
     );
+}
+
+function getPresetSignature(presetId, preset) {
+return JSON.stringify([
+presetId,
+preset.systemPrompt,
+preset.titleMin,
+preset.titleMax,
+preset.descMin,
+preset.descMax
+]);
 }
 
 async function parseApiResponse(response) {
