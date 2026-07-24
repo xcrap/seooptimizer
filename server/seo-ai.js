@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
@@ -31,14 +32,14 @@ const systemInstructions = [
 
 export async function getServiceStatus() {
   const provider = getProvider();
-  const codexReady = provider === "codex" ? await commandSucceeds("codex", ["--version"]) : null;
+  const codexCommand = provider === "codex" ? await resolveCodexCommand() : null;
 
   return {
     provider,
     providerLabel: provider === "codex" ? "Local Codex" : "OpenAI API",
     model: getModel(provider),
     reasoningEffort: getReasoningEffort(),
-    ready: provider === "codex" ? codexReady : Boolean(getRuntimeEnv("OPENAI_API_KEY")),
+    ready: provider === "codex" ? Boolean(codexCommand) : Boolean(getRuntimeEnv("OPENAI_API_KEY")),
     requires: provider === "codex" ? "codex login" : "OPENAI_API_KEY"
   };
 }
@@ -209,7 +210,15 @@ async function runCodexProvider(input) {
 
   args.push("-");
 
-  const stdout = await runProcess("codex", args, codexPrompt, CODEX_TIMEOUT_MS);
+  const codexCommand = await resolveCodexCommand();
+  if (!codexCommand) {
+    throw new ApiError(
+      "Codex CLI was not found. Set SEO_OPTIMIZER_CODEX_PATH to the executable path.",
+      500
+    );
+  }
+
+  const stdout = await runProcess(codexCommand, args, codexPrompt, CODEX_TIMEOUT_MS);
   const output = parseModelJson(stdout);
 
   return {
@@ -332,6 +341,34 @@ function runProcess(command, args, stdin, timeoutMs) {
 
     child.stdin.end(stdin);
   });
+}
+
+async function resolveCodexCommand() {
+  for (const command of getCodexCommandCandidates()) {
+    if (await commandSucceeds(command, ["--version"])) {
+      return command;
+    }
+  }
+
+  return null;
+}
+
+function getCodexCommandCandidates() {
+  const configuredPath = getRuntimeEnv("SEO_OPTIMIZER_CODEX_PATH");
+  const candidates = [configuredPath, "codex", resolve(homedir(), ".local", "bin", "codex")];
+
+  if (process.platform === "darwin") {
+    candidates.push(
+      "/Applications/ChatGPT.app/Contents/Resources/codex",
+      resolve(homedir(), "Applications", "ChatGPT.app", "Contents", "Resources", "codex")
+    );
+  } else if (process.platform === "win32" && process.env.LOCALAPPDATA) {
+    candidates.push(
+      resolve(process.env.LOCALAPPDATA, "Programs", "OpenAI", "Codex", "bin", "codex.exe")
+    );
+  }
+
+  return [...new Set(candidates.filter(Boolean))];
 }
 
 function commandSucceeds(command, args) {

@@ -52,6 +52,8 @@ A modern, AI-powered tool to optimize your page titles and meta descriptions for
    SEO_OPTIMIZER_PROVIDER=codex
    SEO_OPTIMIZER_MODEL=gpt-5.4-mini
    SEO_OPTIMIZER_REASONING_EFFORT=medium
+   # Optional when Codex is installed outside the server process PATH:
+   # SEO_OPTIMIZER_CODEX_PATH=/absolute/path/to/codex
    ```
 
    For the official OpenAI API instead of local Codex:
