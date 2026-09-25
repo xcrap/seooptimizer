@@ -244,8 +244,13 @@ const selectedPreset = savedPresets.find(p => p.id === preferredPresetId) || sav
 setPresets(savedPresets);
 
 if (selectedPreset) {
+    // Keep unsaved Advanced Configuration edits unless the active preset itself changed.
+    const previousPreset = presets.find(p => p.id === currentPresetId);
+    const activePresetChanged = !previousPreset ||
+        getPresetSignature(previousPreset.id, previousPreset) !== getPresetSignature(selectedPreset.id, selectedPreset);
+
     setCurrentPresetId(selectedPreset.id);
-    applyPresetValues(selectedPreset);
+    if (activePresetChanged) applyPresetValues(selectedPreset);
     await persistCurrentPresetId(selectedPreset.id);
 } else {
     setCurrentPresetId("");
@@ -262,17 +267,25 @@ return null;
 
 // Apply Preset
 const applyPreset = (id) => {
+if (id === currentPresetId) return;
 const preset = presets.find(p => p.id === id);
-if (preset) {
+if (!preset) return;
+if (currentPresetHasChanges && !confirm("Discard unsaved changes to the current preset?")) return;
+
 setCurrentPresetId(id);
 applyPresetValues(preset);
 void persistCurrentPresetId(id);
-}
 };
 
 const saveCurrentPreset = async () => {
 const preset = presets.find(p => p.id === currentPresetId);
 if (!preset) return;
+
+const rangeError = getLengthRangeError({ titleMin, titleMax, descMin, descMax });
+if (rangeError) {
+    setError(rangeError);
+    return;
+}
 
 const nextPreset = {
     ...preset,
@@ -318,6 +331,12 @@ if (current < min || current> max) return "text-destructive";
 
     const optimize = async () => {
     if (!title && !description) return;
+
+    const rangeError = getLengthRangeError({ titleMin, titleMax, descMin, descMax });
+    if (rangeError) {
+        setError(rangeError);
+        return;
+    }
 
     setError(null);
     setLoading(true);
@@ -500,15 +519,15 @@ if (current < min || current> max) return "text-destructive";
 	                                            <div className="space-y-2">
 	                                                <Label className="text-[10px] text-zinc-500 uppercase font-bold">Title Range</Label>
 	                                                <div className="flex gap-2">
-	                                                    <Input type="number" value={titleMin} onChange={e => setTitleMin(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
-                                                    <Input type="number" value={titleMax} onChange={e => setTitleMax(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+	                                                    <Input type="number" value={titleMin} onChange={e => setTitleMin(parseLengthInput(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+                                                    <Input type="number" value={titleMax} onChange={e => setTitleMax(parseLengthInput(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
                                                 </div>
                                             </div>
                                             <div className="space-y-2">
                                                 <Label className="text-[10px] text-zinc-500 uppercase font-bold">Desc Range</Label>
                                                 <div className="flex gap-2">
-                                                    <Input type="number" value={descMin} onChange={e => setDescMin(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
-	                                                    <Input type="number" value={descMax} onChange={e => setDescMax(Number(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+                                                    <Input type="number" value={descMin} onChange={e => setDescMin(parseLengthInput(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
+	                                                    <Input type="number" value={descMax} onChange={e => setDescMax(parseLengthInput(e.target.value))} className="h-7 text-xs bg-zinc-900/50 border-zinc-800" />
 	                                                </div>
 	                                            </div>
 	                                        </div>
@@ -791,11 +810,11 @@ if (current < min || current> max) return "text-destructive";
                                             <div className="flex gap-3">
                                                 <div className="space-y-1 flex-1">
                                                     <span className="text-[10px] text-zinc-600">Min</span>
-                                                    <Input type="number" value={editingPreset.titleMin} onChange={e => setEditingPreset({...editingPreset, titleMin: parseInt(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
+                                                    <Input type="number" value={editingPreset.titleMin} onChange={e => setEditingPreset({...editingPreset, titleMin: parseLengthInput(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
                                                 </div>
                                                 <div className="space-y-1 flex-1">
                                                     <span className="text-[10px] text-zinc-600">Max</span>
-                                                    <Input type="number" value={editingPreset.titleMax} onChange={e => setEditingPreset({...editingPreset, titleMax: parseInt(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
+                                                    <Input type="number" value={editingPreset.titleMax} onChange={e => setEditingPreset({...editingPreset, titleMax: parseLengthInput(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
                                                 </div>
                                             </div>
                                         </div>
@@ -804,11 +823,11 @@ if (current < min || current> max) return "text-destructive";
                                             <div className="flex gap-3">
                                                 <div className="space-y-1 flex-1">
                                                     <span className="text-[10px] text-zinc-600">Min</span>
-                                                    <Input type="number" value={editingPreset.descMin} onChange={e => setEditingPreset({...editingPreset, descMin: parseInt(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
+                                                    <Input type="number" value={editingPreset.descMin} onChange={e => setEditingPreset({...editingPreset, descMin: parseLengthInput(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
                                                 </div>
                                                 <div className="space-y-1 flex-1">
                                                     <span className="text-[10px] text-zinc-600">Max</span>
-                                                    <Input type="number" value={editingPreset.descMax} onChange={e => setEditingPreset({...editingPreset, descMax: parseInt(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
+                                                    <Input type="number" value={editingPreset.descMax} onChange={e => setEditingPreset({...editingPreset, descMax: parseLengthInput(e.target.value)})} className="bg-zinc-900/50 border-zinc-800 h-8" />
                                                 </div>
                                             </div>
                                         </div>
@@ -904,6 +923,8 @@ if (current < min || current> max) return "text-destructive";
                                     className="bg-primary hover:bg-primary/90 text-primary-foreground"
                                     onClick={async () => {
                                         if (!editingPreset.name) return alert("Content name required");
+                                        const rangeError = getLengthRangeError(editingPreset);
+                                        if (rangeError) return alert(rangeError);
                                         
                                         let newPresets = [...presets];
                                         let nextActivePresetId = currentPresetId;
@@ -943,6 +964,20 @@ preset.titleMax,
 preset.descMin,
 preset.descMax
 ]);
+}
+
+// Keep a cleared number field empty instead of turning it into 0.
+function parseLengthInput(value) {
+return value === "" ? "" : Number(value);
+}
+
+function getLengthRangeError({ titleMin, titleMax, descMin, descMax }) {
+if ([titleMin, titleMax, descMin, descMax].some(value => !Number.isInteger(value) || value <= 0)) {
+    return "Length limits must be whole numbers greater than 0.";
+}
+if (titleMin > titleMax) return "Title min length can't be greater than the max.";
+if (descMin > descMax) return "Description min length can't be greater than the max.";
+return "";
 }
 
 async function parseApiResponse(response) {

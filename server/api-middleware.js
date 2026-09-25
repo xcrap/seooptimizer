@@ -19,6 +19,8 @@ export function seoOptimizerApiMiddleware() {
     }
 
     try {
+      assertSameOriginRequest(req);
+
       if (url.pathname === "/api/status" && req.method === "GET") {
         sendJson(res, 200, await getServiceStatus());
         return;
@@ -88,7 +90,24 @@ export function seoOptimizerApiMiddleware() {
   };
 }
 
+// Other sites can send "simple" cross-origin requests without a CORS preflight,
+// so reject them explicitly instead of relying on the browser to block the response.
+function assertSameOriginRequest(req) {
+  const fetchSite = req.headers["sec-fetch-site"];
+
+  if (fetchSite && fetchSite !== "same-origin" && fetchSite !== "none") {
+    throw new ApiError("Cross-site requests are not allowed.", 403);
+  }
+}
+
 function readJsonBody(req) {
+  const contentType = req.headers["content-type"] || "";
+
+  // Requiring JSON forces a CORS preflight for cross-origin writes from older browsers.
+  if (!contentType.toLowerCase().startsWith("application/json")) {
+    return Promise.reject(new ApiError("Request body must be sent as application/json.", 415));
+  }
+
   return new Promise((resolve, reject) => {
     let raw = "";
 

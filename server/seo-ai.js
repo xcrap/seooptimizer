@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import OpenAI from "openai";
@@ -12,6 +12,12 @@ const schemaPath = resolve(__dirname, "seo-response.schema.json");
 const DEFAULT_MODEL = "gpt-5.4-mini";
 const DEFAULT_REASONING_EFFORT = "medium";
 const CODEX_TIMEOUT_MS = Number(process.env.SEO_OPTIMIZER_CODEX_TIMEOUT_MS || 120000);
+// Reasoning tokens count toward this limit, so leave room beyond the short JSON answer.
+const OPENAI_MAX_OUTPUT_TOKENS = 4000;
+
+// Variables set in the shell before startup win over .env files. Values that match the
+// files at startup (e.g. loaded by `bun run` or vite.config.js) still follow later .env edits.
+const shellEnv = getShellEnv();
 
 let schemaPromise;
 
@@ -60,8 +66,7 @@ export async function optimizeSeo(input) {
 }
 
 function getProvider() {
-  const configured = getRuntimeEnv("SEO_OPTIMIZER_PROVIDER");
-  const provider = (configured || (getRuntimeEnv("OPENAI_API_KEY") ? "openai" : "codex")).toLowerCase();
+  const provider = (getRuntimeEnv("SEO_OPTIMIZER_PROVIDER") || "codex").toLowerCase();
 
   if (provider !== "codex" && provider !== "openai") {
     throw new ApiError("SEO_OPTIMIZER_PROVIDER must be either codex or openai.", 500);
@@ -105,8 +110,10 @@ function asString(value, fallback) {
 }
 
 function asNumber(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+
   const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function buildPrompt(input) {
@@ -151,7 +158,7 @@ async function runOpenAIProvider(input) {
     model,
     instructions: systemInstructions,
     input: buildPrompt(input),
-    max_output_tokens: 900,
+    max_output_tokens: OPENAI_MAX_OUTPUT_TOKENS,
     text: {
       verbosity: "low",
       format: {
@@ -170,6 +177,12 @@ async function runOpenAIProvider(input) {
   }
 
   const response = await client.responses.create(request);
+
+  if (response.status === "incomplete") {
+    const reason = response.incomplete_details?.reason || "unknown reason";
+    throw new ApiError(`OpenAI stopped before finishing the response (${reason}). Try a lower reasoning effort.`, 502);
+  }
+
   const output = parseModelJson(response.output_text);
 
   return {
@@ -285,10 +298,12 @@ function parseModelJson(raw) {
 function runProcess(command, args, stdin, timeoutMs) {
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(command, args, {
-      cwd: appRoot,
+      // Outside the repo, so Codex does not load this project's AGENTS.md into every prompt.
+      cwd: tmpdir(),
       env: {
         ...process.env,
         ...readRuntimeEnvFiles(),
+        ...shellEnv,
         NO_COLOR: "1"
       },
       stdio: ["pipe", "pipe", "pipe"]
@@ -390,8 +405,18 @@ function cleanProcessError(stderr) {
 }
 
 function getRuntimeEnv(name) {
+  if (Object.prototype.hasOwnProperty.call(shellEnv, name)) return shellEnv[name];
+
   const fileEnv = readRuntimeEnvFiles();
   return Object.prototype.hasOwnProperty.call(fileEnv, name) ? fileEnv[name] : process.env[name];
+}
+
+function getShellEnv() {
+  const startupFileEnv = readRuntimeEnvFiles();
+
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([name, value]) => startupFileEnv[name] !== value)
+  );
 }
 
 function readRuntimeEnvFiles() {

@@ -294,8 +294,11 @@ function asNonEmptyString(value, fallback) {
 }
 
 function asInteger(value, fallback) {
-  const number = Number(value);
-  return Number.isFinite(number) ? Math.trunc(number) : fallback;
+  // Number(null) and Number("") are 0, which would silently save an empty field as 0.
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const number = Math.trunc(Number(value));
+  return Number.isFinite(number) && number > 0 ? number : fallback;
 }
 
 function rowToPreset(row) {
